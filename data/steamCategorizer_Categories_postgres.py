@@ -63,73 +63,76 @@ def GetDevPub(html, devpub):
 	return devpub_content
 
 
+def run(c):
+	for app_id in reversed(app_list):
+		c.execute("""SELECT app_id FROM steam_data WHERE app_id = %s AND data_checked=TRUE;""", [app_id])
+		if c.fetchone() != None:
+			app_list.remove(app_id)
 
-for app_id in reversed(app_list):
-	c.execute("""SELECT genre_1 FROM steam_data WHERE app_id = %s AND genre_1 IS NOT NULL;""", [app_id])
-	if c.fetchone() != None:
-		app_list.remove(app_id)
+	for app_id in app_list:
+		c.execute("""SELECT game_name FROM steam_data WHERE app_id = %s;""", [app_id])
+		name = c.fetchone()
+		app_id = str(app_id)
+		app_id = app_id[1:len(app_id) - 2]
+		html = ''
 
-for app_id in app_list:
-	c.execute("""SELECT game_name FROM steam_data WHERE app_id = %s;""", [app_id])
-	name = c.fetchone()
-	app_id = str(app_id)
-	app_id = app_id[1:len(app_id) - 2]
-	html = ''
+		# Get and read HTML
+		while True:
+			try:
+				response = urllib2.urlopen(URL + str(app_id))
+				# Check for and bypass agecheck
+				if response.geturl() == ("http://store.steampowered.com/agecheck/app/" + str(app_id)):
+					opener = urllib2.build_opener()
+					opener.addheaders.append(('Cookie','birthtime=31564801'))
+					opener.addheaders.append(('Cookie','lastagecheckage=1-January-1971'))
+					response = opener.open(URL + str(app_id))
+					html = response.read()
+				# Check if app does not have store page
+				elif response.geturl() == "http://store.steampowered.com/" or response.geturl() == "store.steampowered.com":
+					break
+				else:
+					html = response.read()
+			except urllib2.HTTPError, e:
+				if e.getcode() == 500:
+					continue
+				else:
+					print e.code
+					print e.read()
+					break
+			break
 
-	# Get and read HTML
-	while True:
-		try:
-			response = urllib2.urlopen(URL + str(app_id))
-			# Check for and bypass agecheck
-			if response.geturl() == ("http://store.steampowered.com/agecheck/app/" + str(app_id)):
-				opener = urllib2.build_opener()
-				opener.addheaders.append(('Cookie','birthtime=31564801'))
-				opener.addheaders.append(('Cookie','lastagecheckage=1-January-1971'))
-				response = opener.open(URL + str(app_id))
-				html = response.read()
-			# Check if app does not have store page
-			elif response.geturl() == "http://store.steampowered.com/" or response.geturl() == "store.steampowered.com":
-				break
-			else:
-				html = response.read()
-		except urllib2.HTTPError, e:
-			if e.getcode() == 500:
-				continue
-			else:
-				print e.code
-				print e.read()
-				break
-		break
+		# Get genres
+		genres = (GetGenres(html))
+		metacritic = GetMetaScore(html)
+		release_year = GetReleaseYear(html)
+		developer = GetDevPub(html, "Developer")
+		publisher = GetDevPub(html, "Publisher")
 
-	# Get genres
-	genres = (GetGenres(html))
-	metacritic = GetMetaScore(html)
-	release_year = GetReleaseYear(html)
-	developer = GetDevPub(html, "Developer")
-	publisher = GetDevPub(html, "Publisher")
+		print "Updating data for " + str(name)[1:len(str(name))-2] + "."
 
-	print "Updating genres for " + str(name)[1:len(str(name))-2] + "."
+		for genre, i in itertools.izip(genres,range(1,6)):
+			sql_statement = """UPDATE steam_data SET genre_{0} = '{1}' WHERE app_id = {2};""".format(i, genres[i-1], app_id)
+			c.execute(sql_statement)
+		
+		if metacritic != "":
+			c.execute("""UPDATE steam_data SET metacritic = %s WHERE app_id = %s""", (metacritic, app_id))
 
-	for genre, i in itertools.izip(genres,range(1,6)):
-		sql_statement = """UPDATE steam_data SET genre_{0} = '{1}' WHERE app_id = {2};""".format(i, genres[i-1], app_id)
-		c.execute(sql_statement)
-	
-	print "Finished updating genres for " + app_id + ".\n\n"
+		if release_year != "":
+			c.execute("""UPDATE steam_data SET release_year = %s WHERE app_id = %s""", (release_year, app_id))
 
-	if metacritic != "":
-		c.execute("""UPDATE steam_data SET metacritic = %s WHERE app_id = %s""", (metacritic, app_id))
+		if developer != "":
+			c.execute("""UPDATE steam_data SET developer = %s WHERE app_id = %s""", (developer, app_id))
 
-	if release_year != "":
-		c.execute("""UPDATE steam_data SET release_year = %s WHERE app_id = %s""", (release_year, app_id))
+		if publisher != "":
+			c.execute("""UPDATE steam_data SET publisher = %s WHERE app_id = %s""", (publisher, app_id))
 
-	if developer != "":
-		c.execute("""UPDATE steam_data SET developer = %s WHERE app_id = %s""", (developer, app_id))
+		c.execute("""UPDATE steam_data SET data_checked = %s WHERE app_id = %s""", ("TRUE", app_id))
 
-	if publisher != "":
-		c.execute("""UPDATE steam_data SET publisher = %s WHERE app_id = %s""", (publisher, app_id))
+		print "Finished updating data for " + app_id + ".\n\n"
 
+		db.commit()
 
-	db.commit()
+	db.close()
 
-db.close()
+run(c)
 

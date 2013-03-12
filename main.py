@@ -1,12 +1,20 @@
-import os, wx, psycopg2, datetime, urllib2
+# -*- coding: utf-8 -*-
+import sys, os, inspect
+import wx, psycopg2, datetime, urllib2
 import xml.etree.ElementTree as ET
+
+cmd_subfolder = os.path.realpath(os.path.abspath(os.path.join(os.path.split(inspect.getfile( inspect.currentframe() ))[0],"data")))
+if cmd_subfolder not in sys.path:
+	sys.path.insert(0, cmd_subfolder)
+
+import steamCategorizer_Categories_postgres
+import steamCategorizer_GetApps_postgres
 
 
 class Start(wx.Frame):
 	def __init__(self, parent, title):
 		# Create window
 		wx.Frame.__init__(self, parent, title = title, size=(1280, 1024), style=wx.DEFAULT_FRAME_STYLE ^ wx.RESIZE_BORDER ^ wx.MAXIMIZE_BOX)
-
 		self.InitUI()
 
 	def InitUI(self):
@@ -28,12 +36,16 @@ class Start(wx.Frame):
 		menuBar.Append(fileMenu, "File")
 		
 		# Import option
-		fileItem1 = fileMenu.Append(wx.NewId(), "Import Steam File", "Steam/userdata/{user id}/7/remote/sharedconfig.vdf")
-		self.Bind(wx.EVT_MENU, self.ImportFile, fileItem1)
+		fileImport = fileMenu.Append(wx.NewId(), "Import Steam File", "Steam/userdata/{user id}/7/remote/sharedconfig.vdf")
+		self.Bind(wx.EVT_MENU, self.ImportUserData, fileImport)
+
+		# Update Database
+		fileUpdateDB = fileMenu.Append(wx.NewId(), "Update Database", "Update the database with information for all Steam games.")
+		self.Bind(wx.EVT_MENU, self.UpdateDatabase, fileUpdateDB)
 
 		# Quit option
-		fileItem2 = fileMenu.Append(wx.ID_EXIT, "Quit", "Close the program")
-		self.Bind(wx.EVT_MENU, self.CloseWindow, fileItem2)
+		fileQuit = fileMenu.Append(wx.ID_EXIT, "Quit", "Close the program")
+		self.Bind(wx.EVT_MENU, self.CloseWindow, fileQuit)
 
 		# Draws the menubar
 		self.SetMenuBar(menuBar)
@@ -102,7 +114,7 @@ class Start(wx.Frame):
 				event,
 				'Import Steam Categories file (sharedconfig.vdf)'))
 		btnImport.Bind(wx.EVT_LEAVE_WINDOW, self.onMouseLeave)
-		self.Bind(wx.EVT_BUTTON, self.ImportFile, btnImport)
+		self.Bind(wx.EVT_BUTTON, self.ImportUserData, btnImport)
 
 		# Delete Button
 		self.btnDelete = wx.Button(panel, label="Delete Game", pos=(600, 615), size=(90, 30))
@@ -298,11 +310,32 @@ class Start(wx.Frame):
 					category_string = """
 						"tags"
 						{0}
-							"{1}"		"{2}"
-						{3}""".format("{", "0", self.lstCategories[app_id], "}")
+							"{2}"		"{3}"
+						{1}""".format("{", "}", "0", self.lstCategories[app_id])
 					file_content = file_content[:category_loc_start] + category_string + file_content[category_loc_start + 1:]
-
 			# Else add app_id
+			else:
+				content_start = """
+				"apps"
+				{"""
+				content_add = """
+					"{2}"
+					{0}
+						"tags"
+						{0}
+							"{3}"		"{4}"
+						{1}
+					{1}
+					""".format("{", "}", app_id, "0", self.lstCategories[app_id])
+				content_start_loc = file_content.find(content_start) + len(content_start)
+				file_content = file_content[:content_start_loc] + content_add + file_content[content_start_loc + 1:]
+
+		for app_id in self.lstDelete:
+			app_loc = file_content.find('\n\t\t\t\t\t"' + app_id + '"')
+			if app_loc != -1:
+				app_loc_end = file_content.find('\n\t\t\t\t\t}', app_loc) + 7
+				file_content = file_content[:app_loc] + file_content[app_loc_end:]
+
 
 		file_dialog = wx.FileDialog(
 			self,
@@ -483,7 +516,7 @@ class Start(wx.Frame):
 					break
 				# Add genre to list if nonexistant
 				genre = str(c.fetchone())
-				genre = genre[2:len(genre)-3]
+				genre = genre[3:len(genre)-3]
 				if genre not in genres:
 					genres.append(genre)
 
@@ -511,7 +544,7 @@ class Start(wx.Frame):
 					if c.rowcount == 0:
 						break
 					app_genre = str(c.fetchone())
-					app_genre = app_genre[2:len(app_genre)-3]
+					app_genre = app_genre[3:len(app_genre)-3]
 					if app_genre == genre:
 						self.Uncategorized.Append(str(app_id) + ' - ' + self.lstGames[str(app_id)])
 
@@ -610,7 +643,8 @@ class Start(wx.Frame):
 
 
 	# Import file function
-	def ImportFile(self, event):
+	def ImportUserData(self, event):
+		# Get User web data
 		get_steam_id = wx.TextEntryDialog(self, message="Please enter the your Steam ID here:", style=wx.OK|wx.CANCEL)
 		if get_steam_id.ShowModal() == wx.ID_OK:
 			steam_id = get_steam_id.GetValue()
@@ -641,6 +675,8 @@ class Start(wx.Frame):
 			wx.MessageBox('Steam ID loading failed. Please make sure your Steam profile is set to Public.', 'Oops!', wx.OK)
 			return 0
 
+
+		# Get User vdf File
 		load_success = wx.MessageDialog(
 			self,
 			"Load successful!\n"
@@ -650,6 +686,7 @@ class Start(wx.Frame):
 			'Load File',
 			wx.OK|wx.CANCEL)
 		self.file_loaded = False
+		file_content = ''
 		if load_success.ShowModal() == wx.ID_OK:
 			fileDialog = wx.FileDialog(self, "Choose your .vdf file", '', '', 'sharedconfig.vdf', wx.OPEN)
 			if fileDialog.ShowModal() == wx.ID_OK:
@@ -747,15 +784,17 @@ class Start(wx.Frame):
 				category = app_section[category_start: category_end]
 
 			app_name = self.lstGames[str(app_id)]
-			app_name = app_name[2:len(app_name)-3]
+			app_name = app_name[3:len(app_name)-3]
 			app_name = app_name
 
 			if category != '':
 				self.lstCategories[app_id] = category
-			else:
+
+
+		for app_id in self.lstAppID:
+			if app_id not in self.lstCategories.keys():
 				self.Uncategorized.Append(str(app_id) + ' - ' + self.lstGames[str(app_id)])
 				self.lstUncategorized.append(app_id)
-
 
 		self.lstAppID.sort()
 		for app_id, category in self.lstCategories.iteritems():
@@ -765,6 +804,12 @@ class Start(wx.Frame):
 		self.Categories.Select(0)
 		self.FilterCategories()
 		
+
+	def UpdateDatabase(self, event):
+		steamCategorizer_GetApps_postgres.run(c)
+		steamCategorizer_Categories_postgres.run(c)
+		wx.MessageBox("Finished updating database.")
+
 
 
 
