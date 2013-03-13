@@ -35,7 +35,6 @@ def run(c):
 				continue
 			else:
 				c.execute("""UPDATE steam_data SET game_name = %s, data_checked = %s WHERE app_id = %s;""", (xml_name, "FALSE", app_id))
-				print "Updated {0} to {1}".format(game_name, xml_name)
 				db.commit()
 
 run(c)

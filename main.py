@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 import sys, os, inspect
-import wx, psycopg2, datetime, urllib2
+import wx, datetime, urllib2, sqlite3
 import xml.etree.ElementTree as ET
+import get_app_id_data
+import get_steam_data
 
 cmd_subfolder = os.path.realpath(os.path.abspath(os.path.join(os.path.split(inspect.getfile( inspect.currentframe() ))[0],"data")))
 if cmd_subfolder not in sys.path:
 	sys.path.insert(0, cmd_subfolder)
 
-import steamCategorizer_Categories_postgres
-import steamCategorizer_GetApps_postgres
 
 
 class Start(wx.Frame):
@@ -515,7 +515,7 @@ class Start(wx.Frame):
 				if c.rowcount == 0:
 					break
 				# Add genre to list if nonexistant
-				genre = str(c.fetchone())
+				genre = c.fetchone()[0]
 				genre = genre[3:len(genre)-3]
 				if genre not in genres:
 					genres.append(genre)
@@ -543,8 +543,7 @@ class Start(wx.Frame):
 					# Move to next app_id if genre_{0} is null
 					if c.rowcount == 0:
 						break
-					app_genre = str(c.fetchone())
-					app_genre = app_genre[3:len(app_genre)-3]
+					app_genre = c.fetchone()[0]
 					if app_genre == genre:
 						self.Uncategorized.Append(str(app_id) + ' - ' + self.lstGames[str(app_id)])
 
@@ -672,7 +671,7 @@ class Start(wx.Frame):
 		self.loading_dialog.Destroy()
 
 		if self.lstGames == 0 or self.lstAppID == 0:
-			wx.MessageBox('Steam ID loading failed. Please make sure your Steam profile is set to Public.', 'Oops!', wx.OK)
+			wx.MessageBox('Steam ID loading failed. Please make sure your Steam profile is set to Public and that the Steam Community servers aren\'t down.', 'Oops!', wx.OK)
 			return 0
 
 
@@ -752,9 +751,7 @@ class Start(wx.Frame):
 				c.execute(sql_statement)
 				if c.description == None:
 					continue
-				game_name = str(c.fetchone())
-				game_name = game_name[3:len(game_name)-3]
-				game_name = game_name.encode('utf8')
+				game_name = c.fetchone()[0]
 				self.lstAppID.append(app_id)
 				self.lstGames[str(app_id)] = game_name
 
@@ -806,8 +803,8 @@ class Start(wx.Frame):
 		
 
 	def UpdateDatabase(self, event):
-		steamCategorizer_GetApps_postgres.run(c)
-		steamCategorizer_Categories_postgres.run(c)
+		get_app_id_data.run(db, c)
+		get_steam_data.run(db, c)
 		wx.MessageBox("Finished updating database.")
 
 
@@ -815,7 +812,7 @@ class Start(wx.Frame):
 
 if __name__ == '__main__':
 	# Start database
-	db = psycopg2.connect("user=postgres dbname=SteamCategorizer password='password'")
+	db = sqlite3.connect("steam_data.db")
 	c = db.cursor()
 
 	# Create the window
