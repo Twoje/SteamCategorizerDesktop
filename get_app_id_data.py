@@ -15,22 +15,27 @@ steam = ET.fromstring(html)
 def run(db, c):
 	for app in steam.iter('app'):
 		xml_name = app.find('name').text
-		app_id = app.find('appid').text
 		if xml_name == None:
 			continue
+		xml_name.encode('utf-8')
+		app_id = app.find('appid').text
 
 		# Check if app already in DB
 		c.execute("""SELECT game_name FROM steam_data WHERE app_id = ?;""", [app_id])
-		game_name = c.fetchone()[0]
-		xml_name.encode('utf-8')
-		if game_name == None:
+		game_name = c.fetchone()
+		if game_name is None:
 			c.execute("""INSERT INTO steam_data (app_id, game_name) VALUES (?, ?);""", (app_id, xml_name))
 			db.commit()
-			print "Added {0} - {1}".format(app_id, xml_name.encode('utf8'))
+			# Causing UnicodeError
+			#print "Added {0} - {1}".format(app_id, xml_name.encode('latin-1'))
+			print "Added a new game."
 		else:
+			game_name = game_name[0]
 			if game_name == xml_name:
 				continue
 			else:
 				c.execute("""UPDATE steam_data SET game_name = ?, data_checked = ? WHERE app_id = ?;""", (xml_name, 0, app_id))
 				db.commit()
-				print "Finished updating {0} - {1}".format(app_id, game_name.encode('utf8'))
+				# Causing UnicodeError
+				#print "Finished updating {0} - {1}".format(app_id, game_name.encode('latin-1'))
+				print "Finished updating game."

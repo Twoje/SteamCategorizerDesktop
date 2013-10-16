@@ -108,7 +108,9 @@ def run(db, c):
 		developer = GetDevPub(html, "Developer")
 		publisher = GetDevPub(html, "Publisher")
 
-		print "Updating data for {0}.".format(name.encode('utf8'))
+		# Causing UnicodeError
+		#print "Updating data for {0}.".format(name.encode('utf8'))
+		print "Updating data for game."
 
 		for genre, i in itertools.izip(genres,range(1,6)):
 			sql_statement = """UPDATE steam_data SET genre_{0} = '{1}' WHERE app_id = {2};""".format(i, genres[i-1], app_id)
