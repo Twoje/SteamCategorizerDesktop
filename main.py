@@ -515,8 +515,10 @@ class Start(wx.Frame):
 				if c.rowcount == 0:
 					break
 				# Add genre to list if nonexistant
-				genre = c.fetchone()[0]
-				genre = genre[3:len(genre)-3]
+				genre = c.fetchone()
+				if genre is None or genre == "()":
+					break
+				genre = genre[0]
 				if genre not in genres:
 					genres.append(genre)
 
@@ -798,8 +800,9 @@ class Start(wx.Frame):
 			if category not in self.Categories.GetStrings():
 				self.Categories.Append(category)
 
-		self.Categories.Select(0)
-		self.FilterCategories()
+		if len(self.lstCategories) > 0:
+			self.Categories.Select(0)
+			self.FilterCategories()
 		
 
 	def UpdateDatabase(self, event):
