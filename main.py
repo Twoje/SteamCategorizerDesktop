@@ -74,6 +74,7 @@ class Start(wx.Frame):
 
 
 	###### SORT DROPDOWN ######
+		wx.StaticText(panel, -1, "(In Development)", pos=(210,40))
 		wx.StaticText(panel, -1, "Sort:", pos=(300,40))
 		self.SortOptions = wx.ComboBox(panel, -1, 
 			pos=(330, 35), 
@@ -83,6 +84,7 @@ class Start(wx.Frame):
 
 
 	###### CATEGORIZATION OPTIONS ######
+		wx.StaticText(panel, -1, "(In Development)", pos=(470,20))
 		self.CategoryOptions = wx.ComboBox(panel, -1, 
 			pos=(470, 35), 
 			size=(150, -1), 
