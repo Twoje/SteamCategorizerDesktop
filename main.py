@@ -545,7 +545,10 @@ class Start(wx.Frame):
 					# Move to next app_id if genre_{0} is null
 					if c.rowcount == 0:
 						break
-					app_genre = c.fetchone()[0]
+					app_genre = c.fetchone()
+					if app_genre is None:
+						break
+					app_genre = app_genre[0]
 					if app_genre == genre:
 						self.Uncategorized.Append(str(app_id) + ' - ' + self.lstGames[str(app_id)])
 
@@ -753,7 +756,10 @@ class Start(wx.Frame):
 				c.execute(sql_statement)
 				if c.description == None:
 					continue
-				game_name = c.fetchone()[0]
+				game_name = c.fetchone()
+				if game_name is None:
+					continue
+				game_name = game_name[0]
 				self.lstAppID.append(app_id)
 				self.lstGames[str(app_id)] = game_name
 
